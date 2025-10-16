@@ -1,0 +1,29 @@
+user -name email token=200  plan=free
+
+organization/business
+owner admin@gmail      token 200 per day
+TM    abc@gmail.com    token?
+TM    xyz@gmail.com    token?
+
+
+org=== plan= free   TM ?  token?
+
+
+
+user==> plans?  
+basic advance
+business ==> plans
+
+
+user  converted to org or not
+
+
+
+update token=> jwt token and updatedNoOfTokens
+get tokens =>  JWTtoken
+
+
+prompt
+
+tm prompt upload?
+owner prompt upload?

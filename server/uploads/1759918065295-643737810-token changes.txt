@@ -1,0 +1,32 @@
+tag line-  Enter the worse
+what we offer 
+change prompt marketplace and prompt lib section swap    done
+tokun icon all change    done
+
+reponse of smartgen restriction no of words    done to 450 words if user not provided
+In smartgen add optimize now button after generation.   done
+
+
+prompt optimizer
+llmprovider add button not dropdown  done
+
+optimize bad calculation ana hein   done
+
+use this version add message to alert    
+
+AI suggestion 
+one button after hover add to field    
+use prompt for 4 suggestion and show better suggestion in output  done
+
+
+need to discuss with sir
+prompt marketplace
+add prompt
+mein changes
+category wise search
+
+
+change prompt history to my prompt   done
+ 
+pro history--all
+

@@ -306,13 +306,14 @@ function EmptyStateCard({
         </div>
 
         {/* CTA — centered */}
-        <button
-          onClick={onClick}
-          className="absolute left-1/2 -translate-x-1/2 bottom-6 h-10 px-5 rounded-[12px] text-white text-[14px] font-medium shadow"
-          style={{ background: GRAD }}
-        >
-          Purchase Prompt
-        </button>
+      <button
+  onClick={onClick}
+  className="absolute left-1/2 -translate-x-1/2 bottom-6 h-10 px-6 rounded-[12px] text-white text-[14px] font-medium shadow whitespace-nowrap"
+  style={{ background: GRAD, maxWidth: "90%" }}
+>
+  Purchase Prompt
+</button>
+
       </CardContent>
     </Card>
   );

@@ -4352,6 +4352,11 @@ const goToSmartgenHistory = () => {
   const recognitionRef = useRef<any>(null);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [isListening, setIsListening] = useState(false);
+   
+    const [isEditingDetailed, setIsEditingDetailed] = useState(false);
+const [editablePrompt, setEditablePrompt] = useState("");
+
+
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -5144,9 +5149,18 @@ const nice =
               </div>
 
               <div className={`${CARD_FRAME} relative p-4 md:p-5`}>
-       <div className="text-white/90 text-sm leading-relaxed whitespace-pre-line pr-4 md:pr-[12rem] pb-24 md:pb-22">
-  {detailedPrompt}
+     <div className="relative text-white/90 text-sm leading-relaxed pr-4 md:pr-[12rem] pb-24 md:pb-22">
+  {isEditingDetailed ? (
+    <Textarea
+      value={editablePrompt}
+      onChange={(e) => setEditablePrompt(e.target.value)}
+      className="w-full min-h-[200px] bg-[#1a1a1a] border border-[#333] text-white resize-vertical p-3 rounded-md"
+    />
+  ) : (
+    <div className="whitespace-pre-line">{detailedPrompt}</div>
+  )}
 </div>
+
 
 
 
@@ -5175,6 +5189,65 @@ const nice =
   <span className="text-sm font-inter">Optimise</span>
 </button>
 
+ {!isEditingDetailed && (
+  <button
+    onClick={() => {
+      setEditablePrompt(detailedPrompt);
+      setIsEditingDetailed(true);
+    }}
+    className="h-10 px-4 rounded-full flex items-center gap-2 border border-[#333335] text-white transition-all duration-300"
+    style={{ background: "#252525" }}
+  >
+    ✏️ Edit
+  </button>
+)}
+
+{isEditingDetailed && (
+  <>
+    <button
+      onClick={() => setIsEditingDetailed(false)}
+      className="h-10 px-4 rounded-full flex items-center gap-2 border border-[#333335] text-white transition-all duration-300"
+      style={{ background: "#252525" }}
+    >
+      ❌ Cancel
+    </button>
+
+    <button
+      onClick={async () => {
+        try {
+          setIsGenerating(true);
+          const result = await llmService.generateDetailedPrompt(editablePrompt);
+          setDetailedPrompt(result.optimizedText);
+          setIsEditingDetailed(false);
+          toast({
+            title: "Regenerated!",
+            description: "Detailed prompt regenerated from your edited version.",
+          });
+
+          await upsertSmartgen({
+            inputPrompt: userPrompt,
+            detailedPrompt: result.optimizedText,
+            tokensUsed: Math.ceil(result.optimizedText.length / 4),
+          });
+        } catch (e: any) {
+          toast({
+            title: "Error",
+            description: e?.message || "Failed to regenerate prompt",
+            variant: "destructive",
+          });
+        } finally {
+          setIsGenerating(false);
+        }
+      }}
+      className="h-10 px-4 rounded-full flex items-center gap-2 border border-[#333335] text-white transition-all duration-300"
+      style={{
+        background: "linear-gradient(270.19deg, #1A73E8 0.16%, #FF14EF 99.84%)",
+      }}
+    >
+      🔄 Regenerate
+    </button>
+  </>
+)}
 
   {/* Save (cop.png) */}
   <button

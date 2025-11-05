@@ -104,14 +104,9 @@ export default function App() {
               {/* other */}
               <Route path="/prompt-library" element={<PromptLibraryPage />} />
              // ✅ App.tsx — protect the marketplace route so direct hits also require login
-<Route
-  path="/prompt-marketplace"
-  element={
-    <RequireAuth>
-      <PromptMarketplacePage />
-    </RequireAuth>
-  }
-/>
+// ✅ Allow viewing marketplace without login
+<Route path="/prompt-marketplace" element={<PromptMarketplacePage />} />
+
 
               <Route path="*" element={<NotFound />} />
               import SavedOptimizations from "@/pages/SavedOptimizations";
@@ -128,6 +123,14 @@ export default function App() {
 
 
    
+  }
+/>
+<Route
+  path="/purchases"
+  element={
+    <RequireAuth>
+      <PromptHistory />
+    </RequireAuth>
   }
 />
 

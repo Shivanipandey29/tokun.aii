@@ -724,26 +724,27 @@ useEffect(() => {
     <header className="w-full bg-black text-white px-3 sm:px-4 py-3 sm:py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Brand */}
-        <button
-          type="button"
-          onClick={handleBrandClick}
-          className="flex items-center gap-2 sm:gap-3 min-w-0 group"
-          aria-label="Go to home"
-        >
-          <span
-            className="truncate group-hover:opacity-90 transition-opacity"
-            style={{
-              fontFamily: "Gilroy, Inter, system-ui, Arial, sans-serif",
-              fontWeight: 700,
-              fontSize: "32px",
-              lineHeight: "100%",
-              textTransform: "uppercase",
-              color: "#ffffff",
-            }}
-          >
-            TOKUN.AI
-          </span>
-        </button>
+        
+        {/* Brand */}
+  <button
+  type="button"
+  onClick={handleBrandClick}
+  className="flex items-center gap-2 sm:gap-3 min-w-0 group bg-transparent"
+  aria-label="Go to home"
+>
+  <img
+    src="/icons/sars.png"
+    alt="Tokun.ai Logo"
+    className="h-24 w-auto object-contain transition-transform duration-200 group-hover:scale-110 bg-transparent"
+  />
+</button>
+
+
+
+
+
+
+        
 
         {/* Actions (Get Pro removed) */}
         <div className="flex items-center gap-4 md:gap-5 flex-shrink-0">

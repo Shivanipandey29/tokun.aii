@@ -255,7 +255,7 @@ if (userType === "ORG" && orgName && !user.orgId) {
 
 
 
-/*
+
     // Send OTP email
     await sendEmail({
       to: normalizedEmail,
@@ -266,7 +266,7 @@ if (userType === "ORG" && orgName && !user.orgId) {
         siteUrl: process.env.SITE_URL || "https://tokun.ai",
       }),
     });
-*/
+
     // IMPORTANT: do not return the OTP in production
     return res.json({ success: true, message: "otp_sent_if_email_is_valid" ,otp: otp});
   } catch (err) {
@@ -476,7 +476,7 @@ router.post("/login/initiate", otpLimiter, async (req, res) => {
     user.otpAttempts = 0;
     user.lockedUntil = null;
     await user.save();
-/*
+
     await sendEmail({
       to: normalizedEmail,
       subject: "Your login code",
@@ -490,7 +490,7 @@ router.post("/login/initiate", otpLimiter, async (req, res) => {
         </div>
       `,
     });
-    */
+    
 
     return res.json({ success: true, message: "otp_sent_if_email_is_valid" , otp:otp });
   } catch (err) {

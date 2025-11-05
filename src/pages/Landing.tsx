@@ -1742,20 +1742,14 @@ const API_BASE = (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, "") || "
       <header className="w-full absolute top-0 left-0 right-0 z-20">
         <div className="px-3 sm:px-4 py-3 sm:py-4">
           <div className="container mx-auto flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <h1
-                className="truncate text-white"
-                style={{
-                  fontFamily: "Gilroy, Inter, system-ui, Arial, sans-serif",
-                  fontWeight: 700,
-                  fontSize: 32,
-                  lineHeight: "100%",
-                  textTransform: "uppercase",
-                }}
-              >
-                TOKUN.AI
-              </h1>
-            </div>
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+  <img
+    src="/icons/sars.png"
+    alt="Tokun.ai Logo"
+    className="h-24 w-auto object-contain transition-transform duration-200 group-hover:scale-110 bg-transparent"
+  />
+</div>
+
 
             <div className="flex items-center gap-4 md:gap-5 flex-shrink-0">
               {variant === "marketing" ? (
@@ -1984,7 +1978,7 @@ const API_BASE = (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, "") || "
             </h1>
 
             <h2 className="text-3xl md:text-4xl font-bold mb-8">
-              Enter the Verse
+              Enter the PromptVerse
             </h2>
             <p className="text-lg md:text-xl text-white/70 max-w-3xl mx-auto leading-relaxed">
               Optimize your LLM prompts, generate better outcomes, and monetize your best prompts—all in one place.
@@ -2022,24 +2016,19 @@ const API_BASE = (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, "") || "
             </motion.button>
           </div>
 
-          <motion.button
-            onClick={() => {
-              if (isAuthenticated) {
-                go(routes.marketplace);
-              } else {
-                go(routes.login);
-              }
-            }}
-            whileHover={{
-              scale: 1.05,
-              background: "linear-gradient(270deg, #1A73E8 0%, #FF14EF 100%)",
-              color: "#fff",
-            }}
-            className="relative px-10 py-5 text-lg rounded-full font-semibold text-white border border-white transition-colors duration-300"
-            style={{ background: "transparent", color: "#ffffffcc" }}
-          >
-            Prompt Marketplace
-          </motion.button>
+         <motion.button
+  onClick={() => go(routes.marketplace)}   // ✅ always go to marketplace
+  whileHover={{
+    scale: 1.05,
+    background: "linear-gradient(270deg, #1A73E8 0%, #FF14EF 100%)",
+    color: "#fff",
+  }}
+  className="relative px-10 py-5 text-lg rounded-full font-semibold text-white border border-white transition-colors duration-300"
+  style={{ background: "transparent", color: "#ffffffcc" }}
+>
+  Prompt Marketplace
+</motion.button>
+
         </div>
 
         {/* STATS */}

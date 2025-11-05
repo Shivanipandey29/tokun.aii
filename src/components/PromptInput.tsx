@@ -1177,6 +1177,8 @@ const PromptInput = ({ onTokensChange, onOptimize, initialText = "" }: PromptInp
   const [isProcessing, setIsProcessing] = useState(false);
   const [optimizationOption, setOptimizationOption] = useState<OptimizationOption | null>(null);
   const [lastUsage, setLastUsage] = useState<OptimizeUsage | undefined>(undefined);
+  const [hasCleared, setHasCleared] = useState(false);
+
   const { toast } = useToast();
    // inside PromptInput component, near other hooks
 const location = useLocation();
@@ -1200,7 +1202,10 @@ const countTokens = async (newText: string) => {
 };
 
 // hydrate on mount/when nav state changes; prefer preCount if provided
-useEffect(() => {
+ useEffect(() => {
+  // ⛔ Skip restoring if user cleared the input
+  if (hasCleared) return;
+
   const candidate = (initialText && initialText.trim()) || navInitialText;
   if (!candidate) return;
 
@@ -1209,11 +1214,10 @@ useEffect(() => {
   if (navPreCount && Number.isFinite(navPreCount.tokens)) {
     onTokensChange(navPreCount.tokens, navPreCount.words ?? 0);
   } else {
-    // trigger async count (and fallback) if no preCount
     countTokens(candidate);
   }
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [initialText, navInitialText]);
+}, [initialText, navInitialText, hasCleared]);
+
 
 // also re-count whenever text changes programmatically (safety net)
 useEffect(() => {
@@ -1708,63 +1712,84 @@ const openLLMWebsite = (provider: keyof typeof LLM_WEBSITES, promptText?: string
             value={text}
             onChange={handleTextChange}
           />
-          {text && (
-            <Button
-              onClick={() => { setText(""); setOptimizerDocId(null); }}
-              variant="outline"
-              size="icon"
-              className="absolute top-3 right-3 h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 border-white/10"
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Clear</span>
-            </Button>
-          )}
+         
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Lightbulb className="h-4 w-4 text-amber-400" />
-            <span className={SUBTLE_TEXT}>Optimizing your prompt can significantly reduce token usage.</span>
-          </div>
+ <div className="mt-3 flex items-center justify-between gap-3">
+  <div className="flex items-center gap-2">
+    <Lightbulb className="h-4 w-4 text-amber-400" />
+    <span className={SUBTLE_TEXT}>
+      Optimizing your prompt can significantly reduce token usage.
+    </span>
+  </div>
 
-          <div className="flex items-center gap-2">
-           <Button
-  variant="outline"
-  className="rounded-2xl min-w-[140px] bg-#252525/40 border-white/10 text-white"
-  onClick={goToOptimizerHistory}
-  title="View your saved optimizations"
->
-  <History className="h-4 w-4 mr-2" />
-  Prompt History
-</Button>
+  <div className="flex items-center gap-2">
+    <Button
+      variant="outline"
+      className="rounded-2xl min-w-[140px] bg-#252525/40 border-white/10 text-white"
+      onClick={goToOptimizerHistory}
+      title="View your saved optimizations"
+    >
+      <History className="h-4 w-4 mr-2" />
+      Prompt History
+    </Button>
 
+    {/* ✅ Show Clear button only when optimized prompt exists */}
+    {optimizationOption && (
+      <Button
+        onClick={() => {
+          setText("");
+          setOptimizationOption(null);
+          setOptimizerDocId(null);
+          setHasCleared(true);     
+          setLastUsage(undefined);
+          onOptimize("", 0, 0, [], undefined);
+            localStorage.removeItem("optimizerInput"); // ✅ clear saved prompt
+          countTokens(""); // reset token/word count
+        }}
+        className="rounded-2xl min-w-[120px] text-white border-0 transition-all duration-300"
+        style={{ background: "#252525" }}
+        onMouseEnter={(e) =>
+          (e.currentTarget.style.backgroundImage = GRADIENT_BG)
+        }
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundImage = "";
+          e.currentTarget.style.background = "#252525";
+        }}
+      >
+        {/* <X className="h-4 w-4 mr-2" /> */}
+        <span className={BTN_TEXT_CLS}>Clear</span>
+      </Button>
+    )}
 
-         <Button
-  onClick={handleOptimize}
-  disabled={isProcessing || !text}
-  className="rounded-2xl min-w-[170px] text-white border-0 disabled:opacity-60 disabled:pointer-events-none transition-all duration-300"
-  style={{ background: "#252525" }}
-  onMouseEnter={(e) => (e.currentTarget.style.backgroundImage = GRADIENT_BG)}
-  onMouseLeave={(e) => {
-    e.currentTarget.style.backgroundImage = "";
-    e.currentTarget.style.background = "#252525";
-  }}
->
-  {isProcessing ? (
-    <>
-      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-      <span className={BTN_TEXT_CLS}>Optimizing...</span>
-    </>
-  ) : (
-    <>
-      <Sparkles className="h-4 w-4 mr-2" />
-      <span className={BTN_TEXT_CLS}>Optimize</span>
-    </>
-  )}
-</Button>
+    <Button
+      onClick={handleOptimize}
+      disabled={isProcessing || !text}
+      className="rounded-2xl min-w-[170px] text-white border-0 disabled:opacity-60 disabled:pointer-events-none transition-all duration-300"
+      style={{ background: "#252525" }}
+      onMouseEnter={(e) =>
+        (e.currentTarget.style.backgroundImage = GRADIENT_BG)
+      }
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundImage = "";
+        e.currentTarget.style.background = "#252525";
+      }}
+    >
+      {isProcessing ? (
+        <>
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          <span className={BTN_TEXT_CLS}>Optimizing...</span>
+        </>
+      ) : (
+        <>
+          <Sparkles className="h-4 w-4 mr-2" />
+          <span className={BTN_TEXT_CLS}>Optimize</span>
+        </>
+      )}
+    </Button>
+  </div>
+</div>
 
-          </div>
-        </div>
 
         {optimizationOption && (
           <div className="mt-5">

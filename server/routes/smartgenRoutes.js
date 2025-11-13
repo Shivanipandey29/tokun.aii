@@ -1,34 +1,21 @@
+
+// server/routes/smartgenRoutes.js
 const express = require("express");
 const Smartgen = require("../models/Smartgen");
- 
 const { requireAuth } = require("../utils/auth");
 const { ensureMonthlyQuota, spendMonthlyTokens } = require("../utils/quota");
 const multer = require("multer");
-const router = express.Router(); 
+const router = express.Router();
 const path = require("path");
 const { PLANS } = require("../config/plans");
-
-
-
-const { spendTokensForIndividual, spendTokensForTeamMember ,spendTokensForOrgOwner} = require("../service/spend");
+const { spendTokensForIndividual, spendTokensForTeamMember, spendTokensForOrgOwner } = require("../service/spend");
 const User = require("../models/User");
-const Organization=require("../models/organization")
+const Organization = require("../models/organization");
 
-
-
-
-// ✨ ADD THIS HELPER (e.g., near the top of the same router file or in a utils file and import it)
-/**
- * Enforce Smartgen history cap for Free users.
- * - Keeps only the most recent `cap` docs for the given user.
- * - Deletes the oldest extras BEFORE creating a new one (prevents race on count==cap).
- */
+// Enforce history cap for Free users
 async function enforceSmartgenHistoryLimit(user) {
-  
   const planKey = String(user?.plan || "free").toLowerCase();
   const plan = PLANS[planKey];
-
-  // if plan doesn't exist or history is unlimited, skip
   if (!plan || !plan.historyEntries || plan.historyEntries === "unlimited") return;
 
   const cap = plan.historyEntries;
@@ -50,14 +37,12 @@ async function enforceSmartgenHistoryLimit(user) {
   }
 }
 
-
-
-// --- Multer setup (local disk) ---
+// Multer setup
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "../uploads")); // make sure /uploads exists
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, "../uploads"));
   },
-  filename: function (req, file, cb) {
+  filename: (req, file, cb) => {
     const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, unique + "-" + file.originalname);
   },
@@ -66,11 +51,7 @@ const upload = multer({ storage });
 
 /**
  * POST /api/smartgen
- * Body: { inputPrompt, detailedPrompt, attachmentUrl?, tokensUsed }
- * - tokensUsed is required and comes from frontend (already computed).
  */
-
-// --- Create Smartgen (with optional single/multiple files) ---
 router.post("/", requireAuth, upload.array("attachments", 5), async (req, res) => {
   try {
     const { inputPrompt, detailedPrompt, tokensUsed } = req.body ?? {};
@@ -82,48 +63,38 @@ router.post("/", requireAuth, upload.array("attachments", 5), async (req, res) =
       return res.status(400).json({ success: false, error: "tokensUsed_required_positive_number" });
     }
 
-    //await ensureMonthlyQuota(req.user);
-   // await spendMonthlyTokens(req.user, amount);
+    let updatedUser = null;
+    let updatedOrg = null;
 
+    if (req.user.userType === "IND") {
+      await enforceSmartgenHistoryLimit(req.user);
+      await spendTokensForIndividual(req.user._id, amount, "smartgen");
+      updatedUser = await User.findById(req.user._id);
+      req.user = updatedUser; // Update req.user
 
-   // Handle IND vs ORG Team Member differently
-   let resuser=null;
-   let org=null;
-if (req.user.userType === "IND") {
-  await enforceSmartgenHistoryLimit(req.user);
-resuser=  await spendTokensForIndividual(req.user._id, amount, "smartgen");
+    } else if (req.user.userType === "TM") {
+      updatedOrg = await Organization.findById(req.user.orgId);
+      if (!updatedOrg.plan) return res.status(403).json({ success: false, error: "not proper plan purchased" });
+      await spendTokensForTeamMember(req.user._id, amount, "smartgen");
+      updatedUser = await User.findById(req.user._id);
+      updatedOrg = await Organization.findById(req.user.orgId);
+      req.user = updatedUser;
 
+    } else if (req.user.userType === "ORG" && req.user.role === "Owner") {
+      updatedOrg = await Organization.findById(req.user.orgId);
+      if (!updatedOrg.plan) return res.status(403).json({ success: false, error: "not proper plan purchased" });
+      await spendTokensForOrgOwner(req.user._id, amount, "smartgen");
+      updatedUser = await User.findById(req.user._id);
+      updatedOrg = await Organization.findById(req.user.orgId);
+      req.user = updatedUser;
 
-} else if (req.user.userType === "TM") {
-  org = await Organization.findById(req.user.orgId);
-  
-  if(!org.plan)
-      return res.status(403).json({ success: false, error: "not proper plan purchased" });
-     
-   resuser=await spendTokensForTeamMember(req.user._id, amount, "smartgen");
-} else if (req.user.userType === "ORG" && req.user.role === "Owner") {
-  // If an Org Owner themself runs Smartgen, treat them like IND Pro/Enterprise
-  org = await Organization.findById(req.user.orgId);
-  
-  if(!org.plan)
-      return res.status(403).json({ success: false, error: "not proper plan purchased" });
-
-
- resuser= await spendTokensForOrgOwner(req.user._id, amount, "smartgen");
-
-
-
-} else {
-  return res.status(403).json({ success: false, error: "invalid_user_type" });
-}
-
-
- // 🟡 ADDED: Enforce Free-plan Smartgen history cap (keeps only latest 5 for Free IND users)
-
+    } else {
+      return res.status(403).json({ success: false, error: "invalid_user_type" });
+    }
 
     const files = (req.files || []).map(f => ({
       filename: f.originalname,
-      path: "/uploads/" + f.filename, // accessible if you serve /uploads statically
+      path: "/uploads/" + f.filename,
       mimetype: f.mimetype,
       size: f.size,
     }));
@@ -149,8 +120,8 @@ resuser=  await spendTokensForIndividual(req.user._id, amount, "smartgen");
         tokensUsed: doc.tokensUsed,
         createdAt: doc.createdAt,
       },
-      user: resuser.user,
-      org: resuser.org,
+      user: updatedUser,   // FRESH USER
+      org: updatedOrg,     // FRESH ORG
     });
   } catch (err) {
     if (err?.code === "insufficient_quota") {
@@ -161,20 +132,17 @@ resuser=  await spendTokensForIndividual(req.user._id, amount, "smartgen");
   }
 });
 
-
-// routes/smartgenRoutes.js
+// PUT /:id
 router.put("/:id", requireAuth, upload.array("attachments", 5), async (req, res) => {
   try {
     const { inputPrompt, detailedPrompt, tokensUsed } = req.body ?? {};
     const smartgenId = req.params.id;
 
-    // Check if Smartgen exists and belongs to the current user
     const smartgen = await Smartgen.findOne({ _id: smartgenId, userId: req.user._id });
     if (!smartgen) {
       return res.status(404).json({ success: false, error: "smartgen_not_found_or_access_denied" });
     }
 
-    // Validate the required fields
     if (inputPrompt && detailedPrompt) {
       smartgen.inputPrompt = inputPrompt;
       smartgen.detailedPrompt = detailedPrompt;
@@ -184,28 +152,24 @@ router.put("/:id", requireAuth, upload.array("attachments", 5), async (req, res)
     if (tokensUsed && (!Number.isFinite(amount) || amount <= 0)) {
       return res.status(400).json({ success: false, error: "tokensUsed_required_positive_number" });
     }
- 
-    // If tokens were updated, we need to spend them and check daily quota
+
     if (tokensUsed) {
-      await ensureMonthlyQuota(req.user);  // Ensure the daily quota is not exceeded
-      await spendMonthlyTokens(req.user, amount);  // Spend the tokens for this Smartgen
-      smartgen.tokensUsed = amount;  // Update the tokensUsed field
+      await ensureMonthlyQuota(req.user);
+      await spendMonthlyTokens(req.user, amount);
+      smartgen.tokensUsed = amount;
     }
 
-    // Handle attachments
     const files = (req.files || []).map(f => ({
       filename: f.originalname,
-      path: "/uploads/" + f.filename, // Make it accessible if served statically
+      path: "/uploads/" + f.filename,
       mimetype: f.mimetype,
       size: f.size,
     }));
 
     if (files.length > 0) {
-      // Append the new files to the existing attachments, if any
       smartgen.attachments = [...smartgen.attachments, ...files];
     }
 
-    // Save the updated Smartgen document
     await smartgen.save();
 
     return res.json({
@@ -232,22 +196,18 @@ router.put("/:id", requireAuth, upload.array("attachments", 5), async (req, res)
   }
 });
 
-
-// GET /api/smartgen
-// Query params: page, limit, orgOnly
+// GET /
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const page  = Math.max(1, parseInt(req.query.page || "1", 10));
+    const page = Math.max(1, parseInt(req.query.page || "1", 10));
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || "20", 10)));
     const orgOnly = String(req.query.orgOnly || "false") === "true";
 
     const filter = { isDeleted: false };
 
     if (orgOnly && req.user.orgId) {
-      // fetch all Smartgen items in the same org
       filter.orgId = req.user.orgId;
     } else {
-      // fetch only the user's own
       filter.userId = req.user._id;
     }
 
@@ -283,8 +243,7 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
-
-// GET /api/smartgen/:id
+// GET /:id
 router.get("/:id", requireAuth, async (req, res) => {
   try {
     const doc = await Smartgen.findById(req.params.id);
@@ -319,21 +278,14 @@ router.get("/:id", requireAuth, async (req, res) => {
   }
 });
 
- // DELETE /api/smartgen/:id → delete one smartgen by ID
+// DELETE /:id
 router.delete("/:id", requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Ensure the record belongs to the logged-in user
-    const deleted = await Smartgen.findOneAndDelete({
-      _id: id,
-      userId: req.user._id,
-    });
+    const deleted = await Smartgen.findOneAndDelete({ _id: id, userId: req.user._id });
 
     if (!deleted) {
-      return res
-        .status(404)
-        .json({ success: false, error: "smartgen_not_found" });
+      return res.status(404).json({ success: false, error: "smartgen_not_found" });
     }
 
     res.json({ success: true, message: "Smartgen deleted", deleted });
@@ -343,11 +295,10 @@ router.delete("/:id", requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/smartgen/user/all → delete all smartgens for current user
+// DELETE /user/all
 router.delete("/user/all", requireAuth, async (req, res) => {
   try {
     const result = await Smartgen.deleteMany({ userId: req.user._id });
-
     res.json({
       success: true,
       message: `Deleted ${result.deletedCount} Smartgen records`,
@@ -357,6 +308,5 @@ router.delete("/user/all", requireAuth, async (req, res) => {
     res.status(500).json({ success: false, error: "server_error" });
   }
 });
-
 
 module.exports = router;

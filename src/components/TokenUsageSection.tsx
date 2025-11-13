@@ -1610,6 +1610,8 @@
 
 
 
+// src/components/TokenUsageSection.tsx
+// src/components/TokenUsageSection.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -1617,75 +1619,31 @@ type Props = { className?: string };
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const TokenUsageSection: React.FC<Props> = ({ className = "" }) => {
-  const { user, token: ctxToken, persistAuth } = useAuth();
+  const { user, token: ctxToken, refreshQuota } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const r = 45;
   const circumference = 2 * Math.PI * r;
- async function fetchQuota() {
-  setIsLoading(true);
-  setErr(null);
-  try {
-    const storedToken =
-      typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    const authHeader =
-      ctxToken || storedToken
-        ? { Authorization: `Bearer ${ctxToken || storedToken}` }
-        : {};
 
-    const res = await fetch(`${API_BASE}/api/quota`, {
-      method: "GET",
-      headers: { "Content-Type": "application/json", ...authHeader },
-      credentials: "include",
-    });
-
-    const data = await res.json();
-    const apiUser = data?.user || null;
-    const org = data?.organization || data?.org || null;
-
-    if (apiUser || org) {
-      // ✅ Always prefer fresh backend values — spread user LAST
-      const merged = {
-        ...(apiUser || {}),
-        ...(org
-          ? {
-              plan: org.plan,
-              billingCycle: org.billingCycle,
-              currentPeriodEnd: org.currentPeriodEnd,
-              orgPoolCap: org.orgPoolCap,
-              orgPoolUsed: org.orgPoolUsed,
-              orgExtraTokensRemaining: org.orgExtraTokensRemaining ?? 0,
-              orgId: org._id,
-            }
-          : {}),
-        ...(user || {}), // spread LAST to keep context-specific props (like role) but not overwrite org data
-      };
-
-      // ✅ Ensure reference changes every time → triggers re-render
-      persistAuth({ user: { ...merged } });
+  async function fetchQuota() {
+    setIsLoading(true);
+    setErr(null);
+    try {
+      await refreshQuota(); // Use the centralized refresh function
+      setLastUpdated(new Date());
+    } catch (e: any) {
+      setErr(e?.message || "Failed to fetch quota");
+    } finally {
+      setIsLoading(false);
     }
-
-    setLastUpdated(new Date());
-  } catch (e: any) {
-    setErr(e?.message || "Failed to fetch quota");
-  } finally {
-    setIsLoading(false);
   }
-}
 
- 
   useEffect(() => {
-    fetchQuota(); // 🔄 initial fetch
-
-    // 🔁 Auto-refresh every 30 seconds
-    const interval = setInterval(fetchQuota, 30000);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchQuota();
   }, []);
 
-  // 🔁 Refresh again when user returns to the tab
   useEffect(() => {
     const handleFocus = () => fetchQuota();
     window.addEventListener("focus", handleFocus);
@@ -1709,6 +1667,18 @@ const TokenUsageSection: React.FC<Props> = ({ className = "" }) => {
     [isOrg, user]
   );
 
+  // DEBUG: Token change detect
+  useEffect(() => {
+    if (user) {
+      console.log("TokenUsageSection: UI Updated!", {
+        used: finalUsed,
+        limit: finalLimit,
+        remaining: finalLimit - finalUsed,
+        time: new Date().toLocaleTimeString(),
+      });
+    }
+  }, [finalUsed, finalLimit]);
+
   const remaining = Math.max(0, finalLimit - finalUsed);
   const progress = finalLimit > 0 ? Math.max(0, Math.min(1, finalUsed / finalLimit)) : 0;
   const dashOffset = circumference - progress * circumference;
@@ -1725,7 +1695,6 @@ const TokenUsageSection: React.FC<Props> = ({ className = "" }) => {
         }}
       >
         <div className="flex items-center gap-4">
-          {/* Circular Ring */}
           <div className="relative w-24 h-24">
             <svg className="w-24 h-24 -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
               <defs>
@@ -1734,14 +1703,7 @@ const TokenUsageSection: React.FC<Props> = ({ className = "" }) => {
                   <stop offset="100%" stopColor="#FF14EF" />
                 </linearGradient>
               </defs>
-              <circle
-                cx="50"
-                cy="50"
-                r={r}
-                stroke="rgba(30, 174, 219, 0.2)"
-                strokeWidth="8"
-                fill="none"
-              />
+              <circle cx="50" cy="50" r={r} stroke="rgba(30, 174, 219, 0.2)" strokeWidth="8" fill="none" />
               <circle
                 cx="50"
                 cy="50"
@@ -1756,42 +1718,39 @@ const TokenUsageSection: React.FC<Props> = ({ className = "" }) => {
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
               <span className="text-2xl font-bold text-white">
-                {isLoading ? "…" : Number(finalUsed || 0).toLocaleString()}
+                {isLoading ? "..." : Number(finalUsed || 0).toLocaleString()}
               </span>
             </div>
           </div>
 
-          {/* Side info */}
           <div className="text-white">
             <div className="flex items-center gap-4 mb-2">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-gradient-to-r from-[#1A73E8] to-[#FF14EF]" />
                 <span className="text-sm text-gray-400">Used</span>
                 <span className="font-bold">
-                  {isLoading ? "…" : Number(finalUsed || 0).toLocaleString()}
+                  {isLoading ? "..." : Number(finalUsed || 0).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-gradient-to-r from-[#1A73E8] to-[#FF14EF]" />
                 <span className="text-sm text-gray-400">Limit</span>
                 <span className="font-bold">
-                  {isLoading ? "…" : Number(finalLimit || 0).toLocaleString()}
+                  {isLoading ? "..." : Number(finalLimit || 0).toLocaleString()}
                 </span>
               </div>
             </div>
 
             <p className="text-sm font-bold">
-              {isLoading ? "Loading…" : `${Number(remaining || 0).toLocaleString()} tokens remaining`}
+              {isLoading ? "Loading..." : `${Number(remaining || 0).toLocaleString()} tokens remaining`}
             </p>
 
-            {/* ✅ Show last updated time */}
             {lastUpdated && (
               <p className="text-xs text-gray-500 mt-2">
                 Last updated: {lastUpdated.toLocaleTimeString()}
               </p>
             )}
 
-            {/* ✅ Optional error display */}
             {err && <p className="mt-2 text-xs text-red-400">({err})</p>}
           </div>
         </div>

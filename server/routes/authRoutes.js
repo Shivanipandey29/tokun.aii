@@ -11,7 +11,7 @@ const { ensureMonthlyQuota } = require("../utils/quota");
 const { buildOtpEmailHtml } = require("../utils/otpemailtemplate"); // adjust path
 const {applyUserPlan} = require("../service/billing");
 
-
+const path = require("path");
 
 const router = express.Router();
 
@@ -477,19 +477,17 @@ router.post("/login/initiate", otpLimiter, async (req, res) => {
     user.lockedUntil = null;
     await user.save();
 
-    await sendEmail({
-      to: normalizedEmail,
-      subject: "Your login code",
-      text: `Your login code is ${otp}. It expires in 5 minutes.`,
-      html: `
-        <div style="font-family:Inter,system-ui,Arial,sans-serif;color:#111">
-          <p>Hi ${user.name ? user.name.split(" ")[0] : "there"},</p>
-          <p>Your login code is:</p>
-          <p style="font-size:24px;font-weight:700;letter-spacing:2px">${otp}</p>
-          <p>This code expires in <strong>5 minutes</strong>.</p>
-        </div>
-      `,
-    });
+await sendEmail({
+  to: normalizedEmail,
+  subject: "Your Tokun.ai login code",
+  html: buildOtpEmailHtml({
+    name: user.name,
+    otp,
+    siteUrl: process.env.SITE_URL || "https://tokun.ai",
+  }),
+
+});
+
     
 
     return res.json({ success: true, message: "otp_sent_if_email_is_valid" , otp:otp });
@@ -716,5 +714,3 @@ but free also a have some features and pro and enterprise also
 i want the scenario like if ind updrade to pro added 
  
 */
-
-

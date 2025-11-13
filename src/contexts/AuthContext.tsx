@@ -1,86 +1,3 @@
-// import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
-
-// interface User { 
-//   id: string; 
-//   email: string; 
-//   name?: string; 
-//   userType?: string;
-//   role?: string;
-//   orgId?: string | null;
-//   plan?: string;
-//   dailyTokensRemaining?: number;
-// }
-
-// interface AuthContextType {
-//   user: User | null;
-//   token: string | null;
-//   isAuthenticated: boolean;
-//   isReady: boolean;
-//   logout: () => void;
-// }
-
-// const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// export const useAuth = () => {
-//   const c = useContext(AuthContext);
-//   if (!c) throw new Error("useAuth must be used within AuthProvider");
-//   return c;
-// };
-
-// // AuthProvider.tsx
-// export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-//   const [user, setUser] = useState<User | null>(null);
-//   const [token, setToken] = useState<string | null>(null);
-//   const [isReady, setIsReady] = useState(false);
-
-//   // Hydrate on mount
-//   useEffect(() => {
-//     const storedUser = localStorage.getItem("tokun_user");
-//     const storedToken = localStorage.getItem("token");
-
-//     if (storedUser) {
-//       try { setUser(JSON.parse(storedUser)); } catch {}
-//     }
-//     if (storedToken) setToken(storedToken);
-
-//     setIsReady(true);
-//   }, []);
-
-//   // 🔥 New: persistAuth available via context
-//   const persistAuth = (payload: any) => {
-//     if (payload?.user) {
-//       setUser(payload.user);  // update state
-//       localStorage.setItem("tokun_user", JSON.stringify(payload.user));
-//     }
-//     if (payload?.token) {
-//       setToken(payload.token); // update state
-//       localStorage.setItem("token", payload.token);
-//     }
-//   };
-
-//   const logout = () => {
-//     setUser(null);
-//     setToken(null);
-//     localStorage.removeItem("tokun_user");
-//     localStorage.removeItem("token");
-//   };
-
-//   const value = useMemo<AuthContextType & { persistAuth: typeof persistAuth }>(
-//     () => ({
-//       user,
-//       token,
-//       isAuthenticated: !!user && !!token,
-//       isReady,
-//       logout,
-//       persistAuth, // expose it
-//     }),
-//     [user, token, isReady]
-//   );
-
-//   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-// };
-
-
 // src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
 
@@ -88,18 +5,14 @@ interface User {
   id: string;
   email: string;
   name?: string;
-  userType?: string;           // "IND" | "ORG"
-  role?: string;               // "Owner" | "Member"
+  userType?: string;
+  role?: string;
   orgId?: string | null;
   plan?: string;
   billingCycle?: "monthly" | "yearly";
   currentPeriodEnd?: string | null;
-
-  // IND caps
   monthlyTokensCap?: number;
   monthlyTokensUsed?: number;
-
-  // ORG caps
   orgPoolCap?: number;
   orgPoolUsed?: number;
   orgExtraTokensRemaining?: number;
@@ -112,6 +25,7 @@ interface AuthContextType {
   isReady: boolean;
   logout: () => void;
   persistAuth: (payload: { user?: Partial<User>; token?: string }) => void;
+  refreshQuota: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -138,10 +52,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const persistAuth: AuthContextType["persistAuth"] = (payload) => {
-    // Deep-merge onto existing user, so org fields are never lost
     if (payload?.user) {
       setUser((prev) => {
-        const merged: User = { ...(prev || {}), ...(payload.user as User) };
+        const merged: User = { ...(prev || {} as User), ...(payload.user as Partial<User>) };
         localStorage.setItem("tokun_user", JSON.stringify(merged));
         return merged;
       });
@@ -152,11 +65,78 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  /** Logout + broadcast logout event to all contexts/tabs */
   const logout = () => {
     setUser(null);
     setToken(null);
     localStorage.removeItem("tokun_user");
     localStorage.removeItem("token");
+
+    // Notify all contexts (PromptContext, other tabs)
+    try {
+      const event = new StorageEvent("storage", {
+        key: "token",
+        oldValue: null,
+        newValue: null,
+        storageArea: localStorage,
+        url: window.location.href,
+      });
+      window.dispatchEvent(event);
+    } catch {
+      // fallback custom event
+      window.dispatchEvent(new CustomEvent("tokun_logout"));
+    }
+  };
+
+  const refreshQuota = async (): Promise<void> => {
+    const currentToken =
+      token || (typeof window !== "undefined" ? localStorage.getItem("token") : null);
+    if (!currentToken) return;
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/quota?t=${Date.now()}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${currentToken}`,
+          },
+          credentials: "include",
+        }
+      );
+
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const apiUser = data?.user || null;
+      const org = data?.organization || data?.org || null;
+
+      if (apiUser || org) {
+        const merged: Partial<User> = {
+          ...(user || {}),
+          ...(apiUser || {}),
+          ...(org
+            ? {
+                plan: org.plan,
+                billingCycle: org.billingCycle,
+                currentPeriodEnd: org.currentPeriodEnd,
+                orgPoolCap: org.orgPoolCap,
+                orgPoolUsed: org.orgPoolUsed,
+                orgExtraTokensRemaining: org.orgExtraTokensRemaining ?? 0,
+                orgId: org._id,
+              }
+            : {}),
+        };
+        setUser((prev) => {
+          const updatedUser = { ...(prev || {} as User), ...merged };
+          localStorage.setItem("tokun_user", JSON.stringify(updatedUser));
+          return updatedUser;
+        });
+      }
+    } catch (err) {
+      console.error("refreshQuota failed:", err);
+    }
   };
 
   const value = useMemo(
@@ -167,6 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isReady,
       logout,
       persistAuth,
+      refreshQuota,
     }),
     [user, token, isReady]
   );

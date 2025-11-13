@@ -158,12 +158,53 @@ router.get("/my", requireAuth, async (req, res) => {
   }
 });
 
+// // GET /prompts/others?type=video&category=UI/UX
+// router.get("/others", requireAuth, async (req, res) => {
+//   try {
+//     const { type, category } = req.query;
+
+//     let filter = { userId: { $ne: req.user._id } }; // exclude own prompts
+
+//     // Filter by attachment type
+//     if (type === "image" || type === "video") {
+//       filter["attachment.type"] = type;
+//     }
+
+//     // Filter by category (optional)
+//     if (category) {
+//       const cat = await Category.findOne({ name: { $regex: `^${category}$`, $options: "i" } });
+//       if (!cat) {
+//         return res.status(400).json({ success: false, error: "invalid_category" });
+//       }
+//       filter.categories = cat._id;
+//     }
+
+//     const prompts = await Prompt.find(filter)
+//       .populate("categories", "name")
+//       .sort({ createdAt: -1 });
+
+//     res.json({ success: true, prompts });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ success: false, error: "server_error" });
+//   }
+// });
+
+
+
+
 // GET /prompts/others?type=video&category=UI/UX
-router.get("/others", requireAuth, async (req, res) => {
+router.get("/others", async (req, res) => {
   try {
     const { type, category } = req.query;
 
-    let filter = { userId: { $ne: req.user._id } }; // exclude own prompts
+    // ✅ Base filter — show only active public prompts
+    let filter = { deleted: { $ne: true } };
+
+    // If logged in (token optional), exclude user's own prompts
+    if (req.user && req.user._id) {
+      filter.userId = { $ne: req.user._id };
+    }
 
     // Filter by attachment type
     if (type === "image" || type === "video") {
@@ -172,9 +213,13 @@ router.get("/others", requireAuth, async (req, res) => {
 
     // Filter by category (optional)
     if (category) {
-      const cat = await Category.findOne({ name: { $regex: `^${category}$`, $options: "i" } });
+      const cat = await Category.findOne({
+        name: { $regex: `^${category}$`, $options: "i" },
+      });
       if (!cat) {
-        return res.status(400).json({ success: false, error: "invalid_category" });
+        return res
+          .status(400)
+          .json({ success: false, error: "invalid_category" });
       }
       filter.categories = cat._id;
     }
@@ -185,7 +230,7 @@ router.get("/others", requireAuth, async (req, res) => {
 
     res.json({ success: true, prompts });
   } catch (err) {
-    console.error(err);
+    console.error("GET /others error:", err);
     res.status(500).json({ success: false, error: "server_error" });
   }
 });

@@ -2701,6 +2701,8 @@ const [saveForPrompt, setSaveForPrompt] = useState<Prompt | null>(null);
 
   // Razorpay script ready?
   const [rzpReady, setRzpReady] = useState(false);
+   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+const [buyerName, setBuyerName] = useState<string>(""); 
 
   /* ---------- Load Razorpay script once ---------- */
   useEffect(() => {
@@ -2913,14 +2915,27 @@ const [saveForPrompt, setSaveForPrompt] = useState<Prompt | null>(null);
             });
 
             const vb = await vr.json();
-            if (vb?.success) {
-              const purchasedId = prompt.id;
-              setPurchasedPrompts((prev) => (prev.includes(purchasedId) ? prev : [...prev, purchasedId]));
-              try {
-                window.dispatchEvent(new CustomEvent("tokun:purchased", { detail: vb.purchase }));
-              } catch {}
-              toast({ title: "Payment Successful", description: "You now own this prompt." });
-            } else {
+          if (vb?.success) {
+  const purchasedId = prompt.id;
+  setPurchasedPrompts((prev) =>
+    prev.includes(purchasedId) ? prev : [...prev, purchasedId]
+  );
+
+  try {
+    window.dispatchEvent(
+      new CustomEvent("tokun:purchased", { detail: vb.purchase })
+    );
+  } catch {}
+
+  // ✅ Show popup
+  setBuyerName(vb?.user?.name || "there");
+  setShowSuccessPopup(true);
+
+  toast({
+    title: "Payment Successful",
+    description: "You now own this prompt.",
+  });
+} else {
               toast({ title: "Verification Failed", description: vb?.error || "Unknown error", variant: "destructive" });
             }
           } catch (err) {
@@ -3023,39 +3038,26 @@ const savePromptToCollections = async ({
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   return (
-    <div className="dark min-h-screen bg-background text-foreground">
+  <div
+  className="dark min-h-screen bg-background text-foreground relative overflow-hidden"
+  style={{
+    backgroundImage: `url('/icons/mpbg.png')`,
+    backgroundRepeat: "no-repeat",
+    backgroundSize: "1600px auto",      // 👈 slightly contained, not full cover
+    backgroundPosition: "center -180px", // 👈 pushes the wave higher (like your image)
+    backgroundAttachment: "scroll",      // 👈 prevents it from locking during scroll
+  }}
+>
+
+
       {/* Header + token usage */}
-      <div className="container mx-auto px-6 pt-6">
-        <Header />
-        {/* <div className="hidden md:flex justify-center mt-3">
-          <TokenUsageSection totalTokensUsed={totalTokensUsed} tokenLimit={tokenLimit} />
-        </div> */}
-        <div className="flex md:hidden justify-center mt-2">
-          <TokenUsageSection totalTokensUsed={totalTokensUsed} tokenLimit={tokenLimit} />
-        </div>
-      </div>
+     {/* 🔹 Full-width compact Header */}
+<div className="w-full bg-transparent  px-4">
+  <Header />
+</div>
+
+
 
       {/* Main Content */}
       <div className="container mx-auto px-6 pb-16">
@@ -3072,20 +3074,59 @@ const savePromptToCollections = async ({
         </div> */}
 
         {/* Title + blurb */}
-        <div className="flex flex-col items-center text-center mb-8">
-          <h1
-            style={{ fontFamily: "Inter", fontWeight: 400, fontSize: "32px", lineHeight: "100%" }}
-            className="text-white"
-          >
-            Prompt Marketplace
-          </h1>
-          <p
-            style={{ fontFamily: "Inter", fontWeight: 200, fontSize: "14px", lineHeight: "100%" }}
-            className="mt-3 text-white/80 max-w-[520px] leading-tight"
-          >
-            Discover and purchase premium AI prompts created by experts from around the world.
-          </p>
-        </div>
+      {/* Section spacing below Header */}
+<div className="mt-10 flex flex-col items-center text-center mb-12">
+  {/* “Prompt” text */}
+  <h1
+    style={{
+      fontFamily: "Inter",
+      fontWeight: 700,
+      fontStyle: "normal",
+      fontSize: "64px",
+      lineHeight: "74px",
+      textAlign: "center",
+      color: "#FFFFFF",
+      marginBottom: "0px",
+    }}
+  >
+    Prompt
+  </h1>
+
+  {/* “Marketplace” below it */}
+  <h2
+    style={{
+      fontFamily: "Inter",
+      fontWeight: 700,
+      fontStyle: "normal",
+      fontSize: "64px",
+      lineHeight: "74px",
+      textAlign: "center",
+      color: "#FFFFFF",
+      marginTop: "0px",
+    }}
+  >
+    Marketplace
+  </h2>
+
+  {/* description text below (two lines) */}
+  <p
+    style={{
+      fontFamily: "Inter",
+      fontWeight: 400,
+      fontStyle: "normal",
+      fontSize: "16px",
+      lineHeight: "140%",
+      textAlign: "center",
+      color: "rgba(255,255,255,0.8)",
+      marginTop: "18px",
+      maxWidth: "680px", // wider for natural 2-line wrap
+    }}
+  >
+    Discover and purchase premium AI prompts created by experts from around the world. 
+    Transform your ideas into reality with our curated collections.
+  </p>
+</div>
+
 
         {/* Navigation + Search/Filters */}
         <div className="flex flex-col items-center">
@@ -3094,6 +3135,8 @@ const savePromptToCollections = async ({
             onSectionChange={(section) => console.log("Section changed:", section)}
           />
         </div>
+        <div className="mt-6"></div>
+
 
         {/* Search + NEW FILTER BAR */}
         <div className="space-y-6 mb-12">
@@ -3500,6 +3543,74 @@ const savePromptToCollections = async ({
           setEnlargeModalOpen(true);
         }}
       />
+
+      {/* ✅ Purchase Success Popup */}
+{/* ✅ Purchase Success Popup */}
+{showSuccessPopup && (
+  <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+    <div
+      className="bg-[#1C1C1C] text-white rounded-2xl shadow-2xl px-8 py-10 w-[420px] text-center animate-fadeIn relative"
+      style={{ border: "1px solid rgba(255,255,255,0.1)" }}
+    >
+      {/* Close button */}
+      <button
+        onClick={() => setShowSuccessPopup(false)}
+        className="absolute top-4 right-4 text-white/60 hover:text-white"
+        aria-label="Close"
+      >
+        ✕
+      </button>
+
+      {/* ✅ Success icon */}
+      <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-emerald-600 flex items-center justify-center">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-10 w-10 text-white"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+
+      <h2 className="text-xl font-semibold mb-2">🎉 Thank you, {buyerName}!</h2>
+      <p className="text-white/80 mb-8">
+        You’ve successfully purchased this prompt!
+      </p>
+
+      <div className="flex items-center justify-center gap-4">
+        {/* ✅ Go to Purchases */}
+        <button
+          onClick={() => {
+            setShowSuccessPopup(false);
+            navigate("/purchases");  // 👈 goes to purchased prompts page
+          }}
+          className="w-40 h-11 rounded-lg text-sm font-medium bg-white/10 hover:bg-white/20 transition"
+        >
+          Go to My Purchases
+        </button>
+
+        {/* ✅ Back to Marketplace */}
+        <button
+          onClick={() => {
+            setShowSuccessPopup(false);
+            navigate("/prompt-marketplace");  // 👈 goes to marketplace
+          }}
+          className="w-40 h-11 rounded-lg text-sm font-medium text-white"
+          style={{
+            background: "linear-gradient(90deg, #FF14EF 0%, #1A73E8 100%)",
+          }}
+        >
+          Prompt Marketplace
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
     </div>
   );
 };
